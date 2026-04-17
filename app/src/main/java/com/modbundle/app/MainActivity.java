@@ -326,26 +326,51 @@ public class MainActivity extends AppCompatActivity {
             prefs.saveInstanceUri(uri);
             updateFolderLabel();
             updateActiveInstanceLabel();
-            Toast.makeText(this, "Instance set: " + name, Toast.LENGTH_SHORT).show();
+            instanceAdapter.setActiveInstancePath(instanceFolder.getAbsolutePath());
+            Toast.makeText(this, "Active: " + name, Toast.LENGTH_SHORT).show();
+            // Stay on instances tab
         });
 
-        // Wire rename listener
+        // Wire rename/edit listener - name + loader + version
         instanceAdapter.setRenameListener((instance, currentName) -> {
-            android.widget.EditText input = new android.widget.EditText(this);
-            input.setText(currentName);
-            input.setTextColor(0xFFFFFFFF);
-            input.setSelectAllOnFocus(true);
-            input.setPadding(48, 24, 48, 8);
+            String path = instance.getAbsolutePath();
+            android.widget.LinearLayout layout = new android.widget.LinearLayout(this);
+            layout.setOrientation(android.widget.LinearLayout.VERTICAL);
+            layout.setPadding(48, 16, 48, 0);
+
+            android.widget.EditText etName = new android.widget.EditText(this);
+            etName.setHint("Instance name");
+            etName.setText(currentName);
+            etName.setTextColor(0xFFFFFFFF);
+            etName.setHintTextColor(0xFF666666);
+            layout.addView(etName);
+
+            android.widget.EditText etLoader = new android.widget.EditText(this);
+            etLoader.setHint("Loader (fabric/forge/neoforge/quilt)");
+            etLoader.setText(instanceNameStore.getLoader(path));
+            etLoader.setTextColor(0xFFFFFFFF);
+            etLoader.setHintTextColor(0xFF666666);
+            layout.addView(etLoader);
+
+            android.widget.EditText etVersion = new android.widget.EditText(this);
+            etVersion.setHint("MC Version (e.g. 1.21.1)");
+            etVersion.setText(instanceNameStore.getVersion(path));
+            etVersion.setTextColor(0xFFFFFFFF);
+            etVersion.setHintTextColor(0xFF666666);
+            layout.addView(etVersion);
+
             new AlertDialog.Builder(this)
-                .setTitle("Rename Instance")
-                .setView(input)
+                .setTitle("Edit Instance")
+                .setView(layout)
                 .setPositiveButton("Save", (d, w) -> {
-                    String newName = input.getText().toString().trim();
-                    if (!newName.isEmpty()) {
-                        instanceNameStore.setName(instance.getAbsolutePath(), newName);
-                        instanceAdapter.notifyDataSetChanged();
-                        updateActiveInstanceLabel();
-                    }
+                    String newName = etName.getText().toString().trim();
+                    String newLoader = etLoader.getText().toString().trim();
+                    String newVersion = etVersion.getText().toString().trim();
+                    if (!newName.isEmpty()) instanceNameStore.setName(path, newName);
+                    instanceNameStore.setLoader(path, newLoader);
+                    instanceNameStore.setVersion(path, newVersion);
+                    instanceAdapter.notifyDataSetChanged();
+                    updateActiveInstanceLabel();
                 })
                 .setNegativeButton("Cancel", null)
                 .show();
@@ -388,10 +413,20 @@ public class MainActivity extends AppCompatActivity {
                 instancesRecycler.setAdapter(instanceAdapter);
             }
             if (btnScanInstances != null) btnScanInstances.setOnClickListener(v -> scanForInstances());
-            if (btnChooseFromInst != null) btnChooseFromInst.setOnClickListener(v -> openFolderPicker());
             if (btnAddInstance != null) btnAddInstance.setOnClickListener(v -> openFolderPicker());
+            // Add auto search path button
+            android.widget.ImageButton btnAddSearchPath = instLayout.findViewById(R.id.btn_add_search_path);
+            if (btnAddSearchPath != null) btnAddSearchPath.setOnClickListener(v -> {
+                Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+                startActivityForResult(intent, 5001);
+            });
         }
 
+        // Set active path on adapter
+        android.net.Uri activeUri = prefs.getInstanceUri();
+        if (activeUri != null && "file".equals(activeUri.getScheme())) {
+            instanceAdapter.setActiveInstancePath(activeUri.getPath());
+        }
         if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.R) {
             scanForInstances();
         }
@@ -808,10 +843,28 @@ public class MainActivity extends AppCompatActivity {
                     final com.modbundle.app.utils.ModMetadata finalMeta = meta;
                     String fileName = (mod instanceof androidx.documentfile.provider.DocumentFile) ? ((androidx.documentfile.provider.DocumentFile) mod).getName() : ((java.io.File) mod).getName();
 
-                    api.getVersions(finalMeta.modId, getSelectedVersion(), getSelectedLoader(),
+                    // Use instance stored loader/version, fallback to spinner, then mod metadata
+                    String iMcVer = "", iLoader = "";
+                    android.net.Uri iUri = prefs.getInstanceUri();
+                    if (iUri != null && "file".equals(iUri.getScheme()) && iUri.getPath() != null) {
+                        iLoader = instanceNameStore.getLoader(iUri.getPath());
+                        iMcVer = instanceNameStore.getVersion(iUri.getPath());
+                    }
+                    if (iMcVer.isEmpty()) iMcVer = getSelectedVersion();
+                    if (iLoader.isEmpty()) iLoader = getSelectedLoader();
+                    final String checkVer = iMcVer;
+                    final String checkLoad = iLoader;
+                    api.getVersions(finalMeta.modId, checkVer, checkLoad,
                         versions -> {
                             if (versions != null && !versions.isEmpty()) {
-                                com.modbundle.app.model.ModVersion latest = versions.get(0);
+                                // Find version matching instance loader+version strictly
+                                com.modbundle.app.model.ModVersion latest = null;
+                                for (com.modbundle.app.model.ModVersion v : versions) {
+                                    boolean lOk = !checkLoad.isEmpty() && v.loaders != null && v.loaders.contains(checkLoad);
+                                    boolean mOk = !checkVer.isEmpty() && v.gameVersions != null && v.gameVersions.contains(checkVer);
+                                    if (lOk && mOk) { latest = v; break; }
+                                }
+                                if (latest == null && !versions.isEmpty()) latest = versions.get(0);
                                 boolean alreadyLatest = false;
                                 if (latest.files != null) {
                                     for (com.modbundle.app.model.ModVersion.VersionFile vf : latest.files) {
@@ -837,9 +890,8 @@ public class MainActivity extends AppCompatActivity {
 
     private void finishCheckUpdates(int updatesFound) {
         handler.post(() -> {
-            btnCheckUpdates.setEnabled(true);
-            btnCheckUpdates.setText("Check Updates");
-            layoutUpdateBar.setVisibility(updatesFound > 0 ? View.VISIBLE : View.GONE);
+            if (btnCheckUpdates != null) { btnCheckUpdates.setEnabled(true); btnCheckUpdates.setText("Check Updates"); }
+            if (layoutUpdateBar != null) layoutUpdateBar.setVisibility(updatesFound > 0 ? View.VISIBLE : View.GONE);
         });
     }
 
@@ -857,7 +909,18 @@ public class MainActivity extends AppCompatActivity {
         com.modbundle.app.utils.ModDownloader.DownloadCallback callback = new com.modbundle.app.utils.ModDownloader.DownloadCallback() {
             public void onProgress(String fileName, int percent) {}
             public void onSuccess(String fileName) {
-                handler.post(() -> { progress.dismiss(); refreshInstalled(); });
+                handler.post(() -> {
+                    progress.dismiss();
+                    // Remove this mod's update entry from cache
+                    installedAdapter.getMetaCache().remove(meta.latestFileName);
+                    refreshInstalled();
+                    // Hide update bar if no more updates
+                    boolean anyLeft = false;
+                    for (com.modbundle.app.utils.ModMetadata m : installedAdapter.getMetaCache().values()) {
+                        if (m.hasUpdate) { anyLeft = true; break; }
+                    }
+                    if (!anyLeft && layoutUpdateBar != null) layoutUpdateBar.setVisibility(View.GONE);
+                });
             }
             public void onError(String error) { handler.post(() -> { progress.dismiss(); Toast.makeText(MainActivity.this, "Update failed", Toast.LENGTH_SHORT).show(); }); }
         };
@@ -945,6 +1008,15 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == 5001 && resultCode == RESULT_OK && data != null) {
+            android.net.Uri uri = data.getData();
+            getContentResolver().takePersistableUriPermission(uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+            prefs.addSavedPath(uri);
+            scanForInstances();
+            Toast.makeText(this, "Search path added!", Toast.LENGTH_SHORT).show();
+            return;
+        }
         if (requestCode == REQUEST_FOLDER && resultCode == RESULT_OK && data != null) {
             Uri uri = data.getData();
             getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);

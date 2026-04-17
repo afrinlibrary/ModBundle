@@ -26,4 +26,10 @@ public class InstanceNameStore {
     public void setLogo(String path, String drawableName) {
         prefs.edit().putString("logo_" + path, drawableName).apply();
     }
+
+    public String getLoader(String path) { return prefs.getString("loader_" + path, ""); }
+    public void setLoader(String path, String loader) { prefs.edit().putString("loader_" + path, loader).apply(); }
+
+    public String getVersion(String path) { return prefs.getString("version_" + path, ""); }
+    public void setVersion(String path, String version) { prefs.edit().putString("version_" + path, version).apply(); }
 }

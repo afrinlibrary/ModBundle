@@ -1,6 +1,7 @@
 package com.modbundle.app.ui;
 
 import android.content.Context;
+import android.net.Uri;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -26,6 +27,7 @@ public class InstanceAdapter extends RecyclerView.Adapter<InstanceAdapter.ViewHo
     private OnLogoListener logoListener;
     private final Context ctx;
     private final InstanceNameStore nameStore;
+    private String activeInstancePath = null;
 
     public InstanceAdapter(Context ctx, List<File> instances, OnSelectListener selectListener) {
         this.ctx = ctx;
@@ -36,6 +38,7 @@ public class InstanceAdapter extends RecyclerView.Adapter<InstanceAdapter.ViewHo
 
     public void setRenameListener(OnRenameListener l) { this.renameListener = l; }
     public void setLogoListener(OnLogoListener l) { this.logoListener = l; }
+    public void setActiveInstancePath(String path) { this.activeInstancePath = path; notifyDataSetChanged(); }
 
     @NonNull @Override
     public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -48,33 +51,46 @@ public class InstanceAdapter extends RecyclerView.Adapter<InstanceAdapter.ViewHo
         File instance = instances.get(position);
         String path = instance.getAbsolutePath();
 
-        // Display name - use custom name if set, otherwise folder name
         String customName = nameStore.getName(path);
         String displayName = (customName != null && !customName.isEmpty()) ? customName : instance.getName();
         holder.name.setText(displayName);
         holder.path.setText(path.length() > 55 ? "..." + path.substring(path.length() - 55) : path);
 
+        // Loader badge
+        String loader = nameStore.getLoader(path);
+        if (loader != null && !loader.isEmpty()) {
+            holder.loaderBadge.setText(loader);
+            holder.loaderBadge.setVisibility(View.VISIBLE);
+        } else {
+            holder.loaderBadge.setVisibility(View.GONE);
+        }
+
+        // Version badge
+        String version = nameStore.getVersion(path);
+        if (version != null && !version.isEmpty()) {
+            holder.versionBadge.setText(version);
+            holder.versionBadge.setVisibility(View.VISIBLE);
+        } else {
+            holder.versionBadge.setVisibility(View.GONE);
+        }
+
         // Logo
         String logoName = nameStore.getLogo(path);
         if (logoName != null) {
             int resId = ctx.getResources().getIdentifier(logoName, "drawable", ctx.getPackageName());
-            if (resId != 0) holder.logo.setImageResource(resId);
-            else holder.logo.setImageResource(R.drawable.ic_launcher_monochrome);
+            holder.logo.setImageResource(resId != 0 ? resId : R.drawable.ic_launcher_monochrome);
         } else {
             holder.logo.setImageResource(R.drawable.ic_launcher_monochrome);
         }
 
-        // Logo click - change logo
-        holder.logo.setOnClickListener(v -> {
-            if (logoListener != null) logoListener.onChangeLogo(instance, path);
-        });
+        // Active state - show Selected button differently
+        boolean isActive = path.equals(activeInstancePath);
+        holder.select.setText(isActive ? "✓ Active" : "Select");
+        holder.select.setBackgroundTintList(android.content.res.ColorStateList.valueOf(
+            isActive ? 0xFF4a3a6b : 0xFF9649b8));
 
-        // Rename click
-        holder.btnRename.setOnClickListener(v -> {
-            if (renameListener != null) renameListener.onRename(instance, displayName);
-        });
-
-        // Select click
+        holder.logo.setOnClickListener(v -> { if (logoListener != null) logoListener.onChangeLogo(instance, path); });
+        holder.btnRename.setOnClickListener(v -> { if (renameListener != null) renameListener.onRename(instance, displayName); });
         holder.select.setOnClickListener(v -> selectListener.onSelect(instance, displayName));
     }
 
@@ -82,7 +98,7 @@ public class InstanceAdapter extends RecyclerView.Adapter<InstanceAdapter.ViewHo
 
     static class ViewHolder extends RecyclerView.ViewHolder {
         ImageView logo;
-        TextView name, path;
+        TextView name, path, loaderBadge, versionBadge;
         ImageButton btnRename;
         Button select;
         ViewHolder(View v) {
@@ -90,6 +106,8 @@ public class InstanceAdapter extends RecyclerView.Adapter<InstanceAdapter.ViewHo
             logo = v.findViewById(R.id.instance_logo);
             name = v.findViewById(R.id.instance_name);
             path = v.findViewById(R.id.instance_path);
+            loaderBadge = v.findViewById(R.id.instance_loader_badge);
+            versionBadge = v.findViewById(R.id.instance_version_badge);
             btnRename = v.findViewById(R.id.btn_rename_instance);
             select = v.findViewById(R.id.btn_select_instance);
         }

@@ -27,6 +27,27 @@
             android:textColor="#FFFFFF"
             android:textSize="18sp"
             android:textStyle="bold"/>
+        <!-- Add auto search path -->
+        <ImageButton
+            android:id="@+id/btn_add_search_path"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@drawable/ic_folder"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:tint="#888888"
+            android:contentDescription="Add auto search path"
+            android:layout_marginEnd="4dp"/>
+        <!-- Scan for instances -->
+        <ImageButton
+            android:id="@+id/btn_scan_instances"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@drawable/ic_update"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:tint="#888888"
+            android:contentDescription="Scan instances"
+            android:layout_marginEnd="4dp"/>
+        <!-- Manually pick instance folder -->
         <ImageButton
             android:id="@+id/btn_add_instance"
             android:layout_width="40dp"
@@ -34,16 +55,7 @@
             android:src="@drawable/ic_add"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:tint="#9649b8"
-            android:contentDescription="Add instance"
-            android:layout_marginEnd="4dp"/>
-        <ImageButton
-            android:id="@+id/btn_scan_instances"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:src="@drawable/ic_filter"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:tint="#888888"
-            android:contentDescription="Scan instances"/>
+            android:contentDescription="Pick instance folder manually"/>
     </LinearLayout>
 
     <!-- Active instance banner -->
@@ -56,8 +68,8 @@
         android:paddingHorizontal="16dp"
         android:paddingVertical="10dp">
         <ImageView
-            android:layout_width="16dp"
-            android:layout_height="16dp"
+            android:layout_width="14dp"
+            android:layout_height="14dp"
             android:src="@drawable/ic_menu_home"
             android:tint="#9649b8"
             android:layout_marginEnd="8dp"/>
@@ -67,7 +79,7 @@
             android:layout_height="wrap_content"
             android:text="No instance selected"
             android:textColor="#9649b8"
-            android:textSize="12sp"/>
+            android:textSize="11sp"/>
     </LinearLayout>
 
     <View
@@ -79,21 +91,10 @@
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/instances_recycler"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
+        android:layout_height="match_parent"
         android:paddingHorizontal="10dp"
         android:paddingTop="8dp"
-        android:clipToPadding="false"/>
-
-    <!-- Saved paths list -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/saved_paths_recycler"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:paddingHorizontal="10dp"
-        android:paddingTop="4dp"
         android:paddingBottom="8dp"
-        android:clipToPadding="false"
-        android:visibility="gone"/>
+        android:clipToPadding="false"/>
 
 </LinearLayout>

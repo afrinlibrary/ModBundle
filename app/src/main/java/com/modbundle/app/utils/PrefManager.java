@@ -53,6 +53,12 @@ public class PrefManager {
         return uris;
     }
 
+    public void addSavedPath(Uri uri) {
+        java.util.Set<String> saved = new java.util.LinkedHashSet<>(getSavedPathStrings());
+        saved.add(uri.toString());
+        prefs.edit().putStringSet(KEY_SAVED_PATHS, saved).apply();
+    }
+
     public void removeSavedPath(Uri uri) {
         Set<String> saved = new LinkedHashSet<>(getSavedPathStrings());
         saved.remove(uri.toString());
